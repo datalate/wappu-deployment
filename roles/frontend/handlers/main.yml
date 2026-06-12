@@ -1,6 +1,13 @@
 ---
+- name: Validate nginx configuration
+  become: true
+  ansible.builtin.command: nginx -t
+  changed_when: false
+  listen: nginx changed
+
 - name: Reload nginx
   become: true
   ansible.builtin.systemd:
     name: nginx
     state: reloaded
+  listen: nginx changed

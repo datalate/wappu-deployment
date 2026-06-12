@@ -76,7 +76,7 @@
     group: www-data
     mode: u=rwX,g=rX,o=rX
   when: frontend_gitclone.changed
-  notify: Reload nginx
+  notify: nginx changed
 
 - name: Add frontend configuration
   become: true
@@ -86,14 +86,14 @@
     owner: www-data
     group: www-data
     mode: u=rwX,g=rX,o=rX
-  notify: Reload nginx
+  notify: nginx changed
 
 - name: Disable default nginx website
   become: true
   ansible.builtin.file:
     path: /etc/nginx/sites-enabled/default
     state: absent
-  notify: Reload nginx
+  notify: nginx changed
 
 - name: Install nginx website config
   become: true
@@ -101,7 +101,7 @@
     src: nginx.conf.j2
     dest: /etc/nginx/sites-available/wappu
     mode: '0644'
-  notify: Reload nginx
+  notify: nginx changed
 
 - name: Enable nginx website
   become: true
@@ -109,4 +109,4 @@
     src: /etc/nginx/sites-available/wappu
     path: /etc/nginx/sites-enabled/wappu
     state: link
-  notify: Reload nginx
+  notify: nginx changed
