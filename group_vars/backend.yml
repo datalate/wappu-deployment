@@ -1,0 +1,6 @@
+---
+build_path: "/opt/build/wappu-api"
+dotnet_version: "10.0"
+
+# API key for the backend. Set your real key here, or override at runtime with -e wappu_api_key='...'
+wappu_api_key: ""

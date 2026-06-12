@@ -1,0 +1,13 @@
+# Ansible
+*.retry
+.vault_pass
+vault_password*
+collections/
+roles/**/files/*.tmp
+
+# Editor / OS
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/

@@ -1,0 +1,5 @@
+---
+build_path: "/opt/build/wappu-frontend"
+nodejs_version: "22.x"
+
+api_base_url: "https://your-domain/api"

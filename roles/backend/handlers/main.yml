@@ -1,0 +1,23 @@
+---
+- name: Reload user systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+    scope: user
+
+- name: Restart wappu-api
+  ansible.builtin.systemd:
+    name: wappu-api
+    scope: user
+    state: restarted
+
+- name: Restart irssi
+  ansible.builtin.systemd:
+    name: irssi
+    scope: user
+    state: restarted
+
+- name: Restart log-parser
+  ansible.builtin.systemd:
+    name: log-parser
+    scope: user
+    state: restarted

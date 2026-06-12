@@ -1,0 +1,112 @@
+---
+- name: Ensure apt keyrings directory exists
+  become: true
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Download NodeSource GPG key
+  become: true
+  ansible.builtin.get_url:
+    url: https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+    dest: /etc/apt/keyrings/nodesource.asc
+    mode: '0644'
+
+- name: Add NodeSource repository
+  become: true
+  ansible.builtin.deb822_repository:
+    name: nodesource
+    types:
+      - deb
+      - deb-src
+    uris: "https://deb.nodesource.com/node_{{ nodejs_version }}"
+    suites: nodistro
+    components: main
+    signed_by: /etc/apt/keyrings/nodesource.asc
+    state: present
+
+- name: Install system dependencies
+  become: true
+  ansible.builtin.apt:
+    update_cache: true
+    state: present
+    pkg:
+      - git
+      - nodejs
+      - nginx
+
+- name: Ensure build directory exists
+  become: true
+  ansible.builtin.file:
+    path: "{{ build_path }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+# Repo intentionally not pinned to a version; deploys track the default branch.
+- name: Clone repository  # noqa: latest[git]
+  ansible.builtin.git:
+    repo: https://github.com/datalate/wappu-frontend.git
+    dest: "{{ build_path }}"
+    accept_newhostkey: true
+  register: frontend_gitclone
+
+- name: Install frontend packages  # noqa: no-handler
+  community.general.npm:
+    path: "{{ build_path }}"
+    ci: true
+  when: frontend_gitclone.changed
+
+- name: Build frontend  # noqa: no-handler
+  ansible.builtin.command: npm run build
+  args:
+    chdir: "{{ build_path }}"
+  when: frontend_gitclone.changed
+  changed_when: true
+
+- name: Copy built files  # noqa: no-handler
+  become: true
+  ansible.builtin.copy:
+    src: "{{ build_path }}/dist/wappu-frontend/"
+    dest: /var/www/wappu
+    remote_src: true
+    owner: www-data
+    group: www-data
+    mode: u=rwX,g=rX,o=rX
+  when: frontend_gitclone.changed
+  notify: Reload nginx
+
+- name: Add frontend configuration
+  become: true
+  ansible.builtin.template:
+    src: frontend-config.json.j2
+    dest: /var/www/wappu/assets/config.json
+    owner: www-data
+    group: www-data
+    mode: u=rwX,g=rX,o=rX
+  notify: Reload nginx
+
+- name: Disable default nginx website
+  become: true
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload nginx
+
+- name: Install nginx website config
+  become: true
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/sites-available/wappu
+    mode: '0644'
+  notify: Reload nginx
+
+- name: Enable nginx website
+  become: true
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/wappu
+    path: /etc/nginx/sites-enabled/wappu
+    state: link
+  notify: Reload nginx

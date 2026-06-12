@@ -10,7 +10,7 @@ RestartSec=10
 KillSignal=SIGINT
 SyslogIdentifier=wappu-api
 Environment="ConnectionStrings__Default=Data Source=%h/database.sqlite"
-Environment="ApiKey__Default=mysecretapikey"
+Environment="ApiKey__Default={{ wappu_api_key }}"
 Environment="ASPNETCORE_ENVIRONMENT=Production"
 Environment="DOTNET_NOLOGO=true"
 

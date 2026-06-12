@@ -1,0 +1,177 @@
+---
+- name: Ensure API key is provided
+  ansible.builtin.assert:
+    that:
+      - wappu_api_key is defined
+      - wappu_api_key | length > 0
+    fail_msg: >-
+      wappu_api_key is not set. Edit group_vars/backend.yml or pass it at
+      runtime with -e wappu_api_key='your-key'.
+
+- name: Check if MS repository is installed
+  ansible.builtin.command: dpkg-query -W packages-microsoft-prod
+  register: backend_ms_repo
+  failed_when: backend_ms_repo.rc > 1
+  changed_when: backend_ms_repo.rc == 1
+
+- name: Download MS repository
+  ansible.builtin.get_url:
+    url: 'https://packages.microsoft.com/config/debian/{{ ansible_facts["distribution_major_version"] }}/packages-microsoft-prod.deb'
+    dest: /tmp/packages-microsoft-prod.deb
+    mode: '0644'
+  when: backend_ms_repo.rc == 1
+
+- name: Install MS repository
+  become: true
+  ansible.builtin.apt:
+    deb: /tmp/packages-microsoft-prod.deb
+  when: backend_ms_repo.rc == 1
+
+- name: Install dependencies
+  become: true
+  ansible.builtin.apt:
+    update_cache: true
+    state: present
+    pkg:
+      - git
+      - "dotnet-sdk-{{ dotnet_version }}"
+      - irssi
+      - tmux
+      - python3
+
+- name: Ensure build directory exists
+  become: true
+  ansible.builtin.file:
+    path: "{{ build_path }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+# Repo intentionally not pinned to a version; deploys track the default branch.
+- name: Clone repository  # noqa: latest[git]
+  ansible.builtin.git:
+    repo: https://github.com/datalate/wappu-api.git
+    dest: "{{ build_path }}"
+    accept_newhostkey: true
+  register: backend_gitclone
+
+# Build pipeline: runs only when the repo changed, but must run inline (not as a
+# handler) so the build completes before the copy/restart steps below.
+- name: Restore project  # noqa: no-handler
+  ansible.builtin.command: dotnet restore
+  args:
+    chdir: "{{ build_path }}/WappuApi"
+  when: backend_gitclone.changed
+  changed_when: true
+
+- name: Build project  # noqa: no-handler
+  ansible.builtin.command: dotnet publish -c Release -o out
+  args:
+    chdir: "{{ build_path }}/WappuApi"
+  when: backend_gitclone.changed
+  changed_when: true
+
+- name: Copy built files  # noqa: no-handler
+  become: true
+  ansible.builtin.copy:
+    src: "{{ build_path }}/WappuApi/out/"
+    dest: /opt/wappu-api
+    remote_src: true
+    owner: root
+    group: root
+    mode: u=rwX,g=rX,o=rX
+  when: backend_gitclone.changed
+  notify: Restart wappu-api
+
+- name: Copy log parser  # noqa: no-handler
+  become: true
+  ansible.builtin.copy:
+    src: "{{ build_path }}/log-parser/"
+    dest: /opt/log-parser
+    remote_src: true
+    owner: root
+    group: root
+    mode: u=rwX,g=rX,o=rX
+  when: backend_gitclone.changed
+  notify: Restart log-parser
+
+- name: Copy wappu-api unit file
+  become: true
+  ansible.builtin.template:
+    src: wappu-api.service.j2
+    dest: /etc/systemd/user/wappu-api.service
+    mode: '0644'
+  notify:
+    - Reload user systemd
+    - Restart wappu-api
+
+- name: Look up service user home directory
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ service_user }}"
+
+- name: Ensure irssi folder exists
+  ansible.builtin.file:
+    path: "{{ ansible_facts['getent_passwd'][service_user][4] }}/.irssi"
+    state: directory
+    owner: "{{ service_user }}"
+    group: "{{ service_user }}"
+    mode: '0755'
+
+- name: Copy irssi config file
+  ansible.builtin.template:
+    src: irssi-config.j2
+    dest: "{{ ansible_facts['getent_passwd'][service_user][4] }}/.irssi/config"
+    owner: "{{ service_user }}"
+    group: "{{ service_user }}"
+    mode: '0644'
+  notify: Restart irssi
+
+- name: Copy irssi unit file
+  become: true
+  ansible.builtin.template:
+    src: irssi.service.j2
+    dest: /etc/systemd/user/irssi.service
+    mode: '0644'
+  notify:
+    - Reload user systemd
+    - Restart irssi
+
+- name: Copy log parser unit file
+  become: true
+  ansible.builtin.template:
+    src: log-parser.service.j2
+    dest: /etc/systemd/user/log-parser.service
+    mode: '0644'
+  notify:
+    - Reload user systemd
+    - Restart log-parser
+
+- name: Ensure lingering is enabled
+  become: true
+  ansible.builtin.command: "loginctl enable-linger {{ service_user }}"
+  args:
+    creates: "/var/lib/systemd/linger/{{ service_user }}"
+
+- name: Enable and start wappu-api service
+  ansible.builtin.systemd:
+    name: wappu-api
+    enabled: true
+    scope: user
+    state: started
+    daemon_reload: true
+
+- name: Enable and start irssi service
+  ansible.builtin.systemd:
+    name: irssi
+    enabled: true
+    scope: user
+    state: started
+
+- name: Enable and start log parser service
+  ansible.builtin.systemd:
+    name: log-parser
+    enabled: true
+    scope: user
+    state: started

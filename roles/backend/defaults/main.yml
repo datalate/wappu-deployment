@@ -1,0 +1,5 @@
+---
+# User that owns the systemd user services and home directory.
+# Defaults to the account you connect as; override only if the services should
+# run as a different user than the SSH/become user.
+service_user: "{{ ansible_user | default(ansible_facts['user_id']) }}"

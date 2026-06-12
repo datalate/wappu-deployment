@@ -1,0 +1,12 @@
+---
+- name: Deploy wappu frontend
+  hosts: frontend
+  tags: frontend
+  roles:
+    - frontend
+
+- name: Deploy wappu backend
+  hosts: backend
+  tags: backend
+  roles:
+    - backend
