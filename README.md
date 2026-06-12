@@ -11,7 +11,8 @@ Deployed projects:
 - Frontend: <https://github.com/datalate/wappu-frontend>
 - API: <https://github.com/datalate/wappu-api>
 
-> Only Debian is currently supported.
+> Only Debian 12+ is currently supported. Could be reworked to support Ubuntu too
+> with some small changes.
 
 > The nginx site this deploys serves plain **HTTP** only. For HTTPS, put a separate
 > reverse proxy in front that terminates TLS and forwards to this host (nginx is a
