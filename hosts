@@ -1,0 +1,5 @@
+[frontend]
+x.x.x.x ansible_connection=ssh ansible_user=wappu
+
+[backend]
+x.x.x.x ansible_connection=ssh ansible_user=wappu

@@ -1,0 +1,25 @@
+[Unit]
+Description=irssi log parser
+Requires=irssi.service
+Requires=wappu-api.service
+After=network.target
+After=irssi.service
+After=wappu-api.service
+StartLimitBurst=10
+StartLimitIntervalSec=120
+
+[Service]
+Type=simple
+WorkingDirectory=/opt
+Environment=PYTHONUNBUFFERED=1
+Environment=LANG=en_US.UTF-8
+ExecStartPre=/bin/mkdir -p %h/irclogs/IRCnet
+ExecStartPre=/usr/bin/touch %h/irclogs/IRCnet/#wappuradio.log
+ExecStart=/bin/bash -c '/usr/bin/tail -n0 -f %h/irclogs/IRCnet/#wappuradio.log | /usr/bin/python3 -m log-parser -i --sqlite-db %h/database.sqlite'
+Restart=always
+RestartSec=10
+SyslogIdentifier=log-parser
+
+[Install]
+WantedBy=default.target
+

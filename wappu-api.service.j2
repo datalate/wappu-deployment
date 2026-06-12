@@ -1,0 +1,18 @@
+[Unit]
+Description=Backend for wappu
+Documentation=https://github.com/datalate/wappu-api
+
+[Service]
+WorkingDirectory=/opt/wappu-api
+ExecStart=/usr/bin/dotnet /opt/wappu-api/WappuApi.dll
+Restart=always
+RestartSec=10
+KillSignal=SIGINT
+SyslogIdentifier=wappu-api
+Environment="ConnectionStrings__Default=Data Source=%h/database.sqlite"
+Environment="ApiKey__Default=mysecretapikey"
+Environment="ASPNETCORE_ENVIRONMENT=Production"
+Environment="DOTNET_NOLOGO=true"
+
+[Install]
+WantedBy=default.target

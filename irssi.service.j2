@@ -1,0 +1,25 @@
+[Unit]
+Description=irssi (in tmux)
+Documentation=man:irssi(1)
+After=network.target
+
+[Service]
+Type=forking
+TimeoutSec=5
+WorkingDirectory=~
+Environment=WIDTH=80 HEIGHT=24
+ExecStart=/bin/sh -c '/usr/bin/tmux -L %p -2 new-session -A -d -x ${WIDTH} -y ${HEIGHT} -s irssi /usr/bin/irssi'
+SyslogIdentifier=irssi
+
+# Send CTRL+u to clear the input line before /quit
+ExecStop=-/usr/bin/tmux -L %p send-keys -t irssi:0 C-u
+ExecStop=-/usr/bin/tmux -L %p send-keys -t irssi:0 "/quit" Enter
+
+# Sending /quit to irssi is asynchronous, so wait for irssi to exit
+# before killing the session in tmux
+ExecStop=/usr/bin/timeout 3 /bin/sh -c 'while tmux has-session -t irssi > /dev/null; do sleep 0.5; done'
+ExecStop=-/usr/bin/tmux -L %p kill-session -t irssi
+
+[Install]
+WantedBy=default.target
+
